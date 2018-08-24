@@ -35,14 +35,16 @@ public class DynamoExpressionBuilder {
     private final List<String> addSection = new ArrayList<>();
     private final List<String> setSection = new ArrayList<>();
     private final List<String> removeSection = new ArrayList<>();
-    private final Alias names;
-    private final Alias vals;
-    private final Alias condVals;
     private final List<String> conditions = new ArrayList<>();
 
+    // Alias handling
+    private Alias names;
+    private Alias vals;
+    private Alias condVals;
     private NameMap nameMap = new NameMap();
-    private Map<String, String> nameAliasToName = new HashMap<>();
+    private Map<String, String> nameAliasToNameMap = new HashMap<>();
     private ValueMap valueMap = new ValueMap();
+    private boolean usingParentAlias = false;
 
     public enum ComparisonOperator {
 
@@ -66,13 +68,30 @@ public class DynamoExpressionBuilder {
         condVals = new Alias(":" + prefix + "condVal");
     }
 
+    public void setAliasGenerator(DynamoExpressionBuilder expressionBuilder) {
+        if (expressionBuilder.conditions.size() > 0) {
+            // This is called when the parent updates object sets the nestedUpdates object and the nested expression builder is modified to re-use the same aliases
+            // This can only be done if the nested alias generators have not yet been used - i.e that no conditions have been set
+            throw new RuntimeException("nested updates objects must be set on the parent updates object before conditions have been added");
+        }
+        this.names = expressionBuilder.names;
+        this.vals = expressionBuilder.vals;
+        this.condVals = expressionBuilder.condVals;
+        this.nameMap = expressionBuilder.getNameMap();
+        this.nameAliasToNameMap = expressionBuilder.nameAliasToNameMap;
+        this.valueMap = expressionBuilder.getValueMap();
+        this.usingParentAlias = true;
+    }
+
     public void merge(DynamoExpressionBuilder dynamoExpressionBuilder) {
         this.addSection.addAll(dynamoExpressionBuilder.addSection);
         this.setSection.addAll(dynamoExpressionBuilder.setSection);
         this.removeSection.addAll(dynamoExpressionBuilder.removeSection);
         this.conditions.addAll(dynamoExpressionBuilder.conditions);
-        nameMap.putAll(dynamoExpressionBuilder.nameMap);
-        valueMap.putAll(dynamoExpressionBuilder.valueMap);
+        if (!usingParentAlias) {
+            nameMap.putAll(dynamoExpressionBuilder.nameMap);
+            valueMap.putAll(dynamoExpressionBuilder.valueMap);
+        }
     }
 
     public void setObjectMapper(ObjectMapper objectMapper) {
@@ -86,8 +105,13 @@ public class DynamoExpressionBuilder {
         return objectMapper;
     }
 
+
     public NameMap getNameMap() {
         return nameMap;
+    }
+
+    public Map<String, String> getNameAliasToNameMap() {
+        return nameAliasToNameMap;
     }
 
     public ValueMap getValueMap() {
@@ -330,11 +354,11 @@ public class DynamoExpressionBuilder {
         }
         for (int index = 0; index < fields.length; index++) {
             if (fields[index] != null) {
-                String alias = nameAliasToName.get(fields[index]);
+                String alias = nameAliasToNameMap.get(fields[index]);
                 if (alias == null) {
                     alias = names.next();
                     nameMap = nameMap.with(alias, fields[index]);
-                    nameAliasToName.put(fields[index], alias);
+                    nameAliasToNameMap.put(fields[index], alias);
                 }
                 fields[index] = alias;
             }

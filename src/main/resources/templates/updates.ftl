@@ -470,6 +470,21 @@ public class ${updatesName} implements ${type.name}, <#if isRoot>Record</#if>Upd
         modified = true;
         return this;
     }
+
+    /**
+    * The updates object will re-use the aliases from the parent to ensure that there are no redundant name aliases in the update expression.
+    * This is only necessary when using DAX because DAX does not allow more than one alias to refer to the same path
+    */
+    public ${updatesName} set${field.name?cap_first}UpdatesWithAliasReUse(${field.elementType}Updates value) {
+        if (this.${field.name} != null) {
+            throw new IllegalStateException("Nested property: ${field.name}, should not be set when passing its Updates object");
+        }
+        expression.setAliasGenerator(value.getExpressionBuilder());
+        this.${field.name}Updates = value;
+        modified = true;
+        return this;
+    }
+
     </#if>
     </#list>
 
@@ -573,7 +588,7 @@ public class ${updatesName} implements ${type.name}, <#if isRoot>Record</#if>Upd
                 DynamoExpressionBuilder nestedExpression = this.${field.name}Updates.getExpressionBuilder();
                 nestedExpression.setObjectMapper(expression.getObjectMapper());
                 this.${field.name}Updates.processUpdateExpression();
-                expression.merge(this.${field.name}Updates.getExpressionBuilder());
+                expression.merge(nestedExpression);
             }
             </#if>
             </#if>
