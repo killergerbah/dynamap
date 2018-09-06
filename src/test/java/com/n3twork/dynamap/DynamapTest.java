@@ -1025,7 +1025,19 @@ public class DynamapTest {
         updated = dynamap.update(new UpdateParams<>(testDocumentUpdates).withReturnValue(DynamapReturnValue.UPDATED_OLD));
         Assert.assertEquals(updated.getString(), "string2");
 
+        // test overwrite of nested object
+        doc = createTestDocumentBean(nested);
+        dynamap.save(new SaveParams<>(doc));
 
+        String nestedId = UUID.randomUUID().toString();
+        NestedType2Bean nested2 = new NestedType2Bean().setId(nestedId);
+        testDocumentUpdates = doc.createUpdates();
+        testDocumentUpdates.setString("str");
+        testDocumentUpdates.setNestedObject2(nested2);
+
+        updated = dynamap.update(new UpdateParams<>(testDocumentUpdates).withReturnValue(DynamapReturnValue.ALL_NEW));
+        Assert.assertNotNull(updated.getNestedObject2());
+        Assert.assertEquals(updated.getNestedObject2().getId(), nestedId);
     }
 
     private TestDocumentBean createTestDocumentBean(NestedTypeBean nestedTypeBean) {
